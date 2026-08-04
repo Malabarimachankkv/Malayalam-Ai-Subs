@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Malayalam AI Subs — Setup</title>
+<style>
+  :root {
+    --bg: #12100d;
+    --panel: #1b1815;
+    --line: #332e26;
+    --gold: #c9973f;
+    --text: #ede6da;
+    --muted: #9c9285;
+    --err: #e0654f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 48px 20px;
+  }
+  .wrap { max-width: 560px; width: 100%; }
+  .eyebrow {
+    font-size: 13px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 10px;
+    font-weight: 600;
+  }
+  h1 {
+    font-size: 30px;
+    line-height: 1.25;
+    margin: 0 0 12px;
+    font-weight: 700;
+  }
+  p.lede { color: var(--muted); font-size: 15px; line-height: 1.6; margin: 0 0 32px; }
+  .step {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 20px 22px;
+    margin-bottom: 16px;
+  }
+  .step-num {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--gold);
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+  }
+  .step h2 { font-size: 16px; margin: 0 0 8px; }
+  .step p { color: var(--muted); font-size: 14px; line-height: 1.6; margin: 0 0 12px; }
+  a.ext { color: var(--gold); text-decoration: none; border-bottom: 1px solid rgba(201,151,63,0.4); }
+  a.ext:hover { border-bottom-color: var(--gold); }
+  input[type=text] {
+    width: 100%;
+    background: #0e0c0a;
+    border: 1px solid var(--line);
+    color: var(--text);
+    padding: 12px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: ui-monospace, monospace;
+  }
+  input[type=text]:focus { outline: none; border-color: var(--gold); }
+  button {
+    width: 100%;
+    background: var(--gold);
+    color: #1b1500;
+    border: none;
+    padding: 13px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 14px;
+  }
+  button:hover { filter: brightness(1.08); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  #result { display: none; margin-top: 16px; }
+  #result.show { display: block; }
+  .url-box {
+    background: #0e0c0a;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+    word-break: break-all;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .btn-row { display: flex; gap: 10px; }
+  .btn-row button { margin-top: 0; }
+  .btn-secondary { background: transparent; border: 1px solid var(--gold); color: var(--gold); }
+  #err { color: var(--err); font-size: 13px; margin-top: 10px; display: none; }
+  .note { font-size: 12px; color: var(--muted); margin-top: 28px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Malayalam AI Subs</div>
+  <h1>Every movie, subtitled in your own words.</h1>
+  <p class="lede">This addon translates English subtitles to Malayalam using Gemini — but it runs on <em>your</em> free Google quota, not a shared one. Two steps, no account, nothing stored on our end.</p>
+
+  <div class="step">
+    <div class="step-num">STEP 1</div>
+    <h2>Get a free Gemini API key</h2>
+    <p>No credit card needed. Takes about 30 seconds.</p>
+    <p><a class="ext" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Open Google AI Studio →</a></p>
+  </div>
+
+  <div class="step">
+    <div class="step-num">STEP 2</div>
+    <h2>Paste it below</h2>
+    <p>The key is embedded directly into your install link. It never touches a database.</p>
+    <input type="text" id="apiKey" placeholder="AIzaSy..." autocomplete="off" spellcheck="false" />
+    <button id="generateBtn">Generate install link</button>
+    <div id="err"></div>
+  </div>
+
+  <div id="result">
+    <div class="step">
+      <h2>You're set</h2>
+      <p>Copy this link into Nuvio/Stremio's addon search, or tap install directly.</p>
+      <div class="url-box" id="manifestUrl"></div>
+      <div class="btn-row">
+        <button id="copyBtn" class="btn-secondary">Copy link</button>
+        <button id="installBtn">Install in Stremio</button>
+      </div>
+    </div>
+  </div>
+
+  <p class="note">Your key stays inside your personal install link — the addon uses it only to call Gemini on your behalf when a subtitle isn't already cached. Already-translated movies load instantly for everyone, no quota used.</p>
+</div>
+
+<script>
+  const btn = document.getElementById('generateBtn');
+  const input = document.getElementById('apiKey');
+  const err = document.getElementById('err');
+  const result = document.getElementById('result');
+  const urlBox = document.getElementById('manifestUrl');
+  const copyBtn = document.getElementById('copyBtn');
+  const installBtn = document.getElementById('installBtn');
+
+  let manifestUrl = '';
+
+  btn.addEventListener('click', () => {
+    const key = input.value.trim();
+    err.style.display = 'none';
+
+    if (!key.startsWith('AIza') || key.length < 20) {
+      err.textContent = 'That doesn\\'t look like a valid Gemini API key. Double check you copied the whole thing.';
+      err.style.display = 'block';
+      return;
+    }
+
+    const config = { geminiKey: key };
+    const encoded = btoa(JSON.stringify(config))
+      .replace(/\\+/g, '-')
+      .replace(/\\//g, '_')
+      .replace(/=+$/, '');
+
+    manifestUrl = `${window.location.origin}/${encoded}/manifest.json`;
+    urlBox.textContent = manifestUrl;
+    result.classList.add('show');
+  });
+
+  copyBtn.addEventListener('click', () => {
+    navigator.clipboard.writeText(manifestUrl);
+    copyBtn.textContent = 'Copied!';
+    setTimeout(() => (copyBtn.textContent = 'Copy link'), 1500);
+  });
+
+  installBtn.addEventListener('click', () => {
+    const stremioUrl = manifestUrl.replace(/^https?:\\/\\//, 'stremio://');
+    window.location.href = stremioUrl;
+  });
+</script>
+</body>
+</html>
