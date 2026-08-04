@@ -1,84 +1,69 @@
 # Malayalam AI Subs
 
 Stremio/Nuvio addon that translates English subtitles to Malayalam on demand.
-Only one key needed, ever: the user's own free Gemini API key.
+Completely independent from your Malayalam Subs project — no shared bucket,
+no shared infra.
 
-## How it works (simple version)
+## How it works
 
-1. Visit `/configure`, paste a free Gemini key, get an install link.
+1. Visit `/configure`, paste a free Gemini API key, get an install link.
 2. Install that link in Nuvio/Stremio.
-3. Play a movie → the addon fetches an English subtitle (Podnapisi.net, free,
-   no account needed), translates it to Malayalam with your Gemini key, and
-   shows it.
-4. Already-translated movies are cached (Backblaze B2), so the second person
-   ever to watch that movie gets it instantly, no translation needed.
+3. Play a movie → the addon fetches an English subtitle from OpenSubtitles,
+   translates it to Malayalam with your Gemini key, and shows it.
+4. While the server stays running, already-translated movies are served
+   instantly from memory — no re-translation on repeat plays. A server
+   restart (Render free tier spins down when idle) clears that cache, so
+   the next request after a cold start re-translates once.
 
-No login, no database, no OpenSubtitles account, nothing to manage besides
-your own Gemini key.
+Two keys are involved, but only one of them is anything you or an end user
+ever touches:
+- **Gemini key** — entered per-install on the config page. This is the only
+  key anyone installing the addon deals with.
+- **OpenSubtitles key** — set once by you as a server env var, to fetch the
+  source English subtitle. Free, no credit card. Nobody installing the addon
+  sees this.
 
-## Environment variables (set these in Render)
+## Environment variables (Render)
 
 | Variable | Purpose |
 |---|---|
-| `B2_ENDPOINT` | e.g. `https://s3.us-west-004.backblazeb2.com` |
-| `B2_REGION` | e.g. `us-west-004` |
-| `B2_KEY_ID` | B2 application key ID |
-| `B2_APP_KEY` | B2 application key |
-| `B2_BUCKET` | Bucket name (can reuse your Malayalam Subs bucket — writes under `ml-ai-subs/` so nothing collides) |
-| `B2_PUBLIC_URL_BASE` | Public base URL for reading cached files, e.g. `https://f004.backblazeb2.com/file/your-bucket` |
+| `OPENSUBTITLES_API_KEY` | Free key from https://www.opensubtitles.com/en/consumers |
 
-That's it — no OpenSubtitles key, no other setup.
+That's the only one. No B2, no database.
 
 ## Deploy to Render, step by step
 
-1. **Push this code to GitHub**: create a new repo (e.g. `malayalam-ai-subs`),
-   upload these files via GitHub's web "upload an existing file" option, commit.
-2. **Get your B2 credentials ready** — same ones you already use for Malayalam Subs.
+1. **Push this code to GitHub** — new repo (e.g. `malayalam-ai-subs`), upload
+   these files via GitHub's "upload an existing file" web option, commit.
+2. **Get a free OpenSubtitles API key** from the link above (2 minutes, no card).
 3. **New Web Service on Render**: render.com → New + → Web Service → connect
    the repo.
    - Build Command: `npm install`
    - Start Command: `npm start`
    - Instance Type: Free
-4. **Add the environment variables** listed above, one by one.
-5. **Deploy** — watch the Logs tab for `Malayalam AI Subs running on port ...`.
-6. Visit `https://your-service.onrender.com/configure`, paste a Gemini key,
-   copy the install link into Nuvio.
-
-## If subtitles aren't showing up
-
-Podnapisi's exact response format isn't fully documented publicly, so the
-parsing in `lib/subtitleSource.js` is defensive but may need a small tweak
-for some titles. To check what's actually coming back:
-
-```
-https://your-service.onrender.com/debug/podnapisi?imdb=tt1234567
-```
-
-That returns the raw Podnapisi response for that movie. If it looks
-different from what `lib/subtitleSource.js` expects, that's the file to
-adjust — the field names it's trying (`download`, `url`, `language`, etc.)
-are best guesses based on how similar subtitle APIs are usually shaped.
+4. **Add environment variable** `OPENSUBTITLES_API_KEY`.
+5. **Deploy** — watch Logs for `Malayalam AI Subs running on port ...`.
+6. Visit `https://your-service.onrender.com/configure`, paste your Gemini
+   key, copy the install link into Nuvio.
 
 ## Known limitations
 
-- **Podnapisi is unofficial/undocumented** — unlike OpenSubtitles' versioned
-  REST API, there's no guarantee its response format stays stable long-term.
-  If it silently changes, subtitles will just stop showing (fails soft, no
-  crash) until the parsing is adjusted.
-- **Zip files aren't unpacked yet** — if Podnapisi returns a `.zip` instead of
-  a raw `.srt` for a given subtitle, that one throws a clear error rather
-  than silently failing. Worth adding a zip-extraction step if you hit this
-  often (say so and I'll add it).
-- **Gemini free tier** comfortably covers a handful of full-movie translations
-  per day per user — see `lib/translate.js` for the chunking approach. If a
-  translation chunk fails twice, it falls back to English for just that
-  chunk rather than breaking subtitle sync entirely.
+- **OpenSubtitles free tier** caps downloads/day account-wide — this is the
+  ceiling on how many *new* titles can be translated per day, well before
+  Gemini quota is a concern.
+- **No persistent cache** — by design, per your call to drop B2. Translations
+  only survive as long as the server process runs. Fine for personal use;
+  worth revisiting if this ever needs to serve many users at scale.
+- **Gemini free tier** comfortably covers a handful of full-movie
+  translations per user per day (see `lib/translate.js` for the chunking
+  approach). If a chunk fails twice, it falls back to English for just that
+  chunk rather than breaking subtitle sync.
 
 ## Local testing
 
 ```
 npm install
-B2_ENDPOINT=xxx B2_REGION=xxx B2_KEY_ID=xxx B2_APP_KEY=xxx B2_BUCKET=xxx B2_PUBLIC_URL_BASE=xxx npm start
+OPENSUBTITLES_API_KEY=xxx npm start
 ```
 
 Then open `http://localhost:3000/configure`.

@@ -1,7 +1,7 @@
 const express = require("express");
 const path = require("path");
 const { encodeConfig, decodeConfig } = require("./lib/config");
-const { fetchEnglishSrt, rawSearch } = require("./lib/subtitleSource");
+const { fetchEnglishSrt } = require("./lib/subtitleSource");
 const { translateEntries } = require("./lib/translate");
 const { parseSrt, buildSrt } = require("./lib/srt");
 const { getCached, putCached } = require("./lib/cache");
@@ -38,6 +38,11 @@ app.get("/:config/manifest.json", (req, res) => {
   });
 });
 
+function subtitleKey(imdbId, season, episode) {
+  const suffix = season && episode ? `-s${season}e${episode}` : "";
+  return `${imdbId}${suffix}`;
+}
+
 app.get("/:config/subtitles/:type/:id.json", async (req, res) => {
   const cfg = decodeConfig(req.params.config);
   if (!cfg) return res.status(400).json({ error: "Invalid config" });
@@ -47,18 +52,22 @@ app.get("/:config/subtitles/:type/:id.json", async (req, res) => {
     const [imdbId, season, episode] = req.params.id.split(":");
     const identity = { imdbId, season, episode };
 
-    let url = await getCached(identity);
+    let srt = await getCached(identity);
 
-    if (!url) {
-      const lockKey = `${imdbId}:${season || ""}:${episode || ""}`;
+    if (!srt) {
+      const lockKey = subtitleKey(imdbId, season, episode);
       if (!inFlight.has(lockKey)) {
         inFlight.set(
           lockKey,
           translateAndCache(cfg.geminiKey, identity).finally(() => inFlight.delete(lockKey))
         );
       }
-      url = await inFlight.get(lockKey);
+      srt = await inFlight.get(lockKey);
     }
+
+    const host = `${req.protocol}://${req.get("host")}`;
+    const key = subtitleKey(imdbId, season, episode);
+    const url = `${host}/subs/${encodeURIComponent(key)}.srt`;
 
     res.json({ subtitles: [{ id: `ml-ai-${imdbId}`, lang: "mal", url }] });
   } catch (e) {
@@ -67,23 +76,16 @@ app.get("/:config/subtitles/:type/:id.json", async (req, res) => {
   }
 });
 
-// Debug helper: hit this after deploying to see Podnapisi's real raw response
-// for a given movie. Useful for confirming/fixing field names if translation
-// isn't finding subtitles for a specific title.
-app.get("/debug/podnapisi", async (req, res) => {
-  const imdb = req.query.imdb;
-  if (!imdb) return res.status(400).json({ error: "pass ?imdb=tt1234567" });
-  try {
-    const raw = await rawSearch(imdb);
-    res.json(raw);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+// Serves the actual translated subtitle file - the URL returned above points here
+app.get("/subs/:key.srt", async (req, res) => {
+  const srt = await getCached({ imdbId: req.params.key }); // key already includes season/episode suffix if any
+  if (!srt) return res.status(404).send("Subtitle not found or expired from cache - replay the title to regenerate it");
+  res.set("Content-Type", "text/plain; charset=utf-8");
+  res.send(srt);
 });
 
 async function translateAndCache(geminiKey, identity) {
-  const { srt: englishSrt } = await fetchEnglishSrt(identity);
-
+  const englishSrt = await fetchEnglishSrt(identity);
   const entries = parseSrt(englishSrt);
   const translated = await translateEntries(geminiKey, entries, {
     onProgress: (done, total) => console.log(`${identity.imdbId}: translated chunk ${done}/${total}`),
