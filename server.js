@@ -1,7 +1,7 @@
 const express = require("express");
 const path = require("path");
 const { encodeConfig, decodeConfig } = require("./lib/config");
-const { fetchEnglishSrt } = require("./lib/subtitleSource");
+const { fetchEnglishSrt, rawSearch } = require("./lib/subtitleSource");
 const { translateEntries } = require("./lib/translate");
 const { parseSrt, buildSrt } = require("./lib/srt");
 const { getCached, putCached } = require("./lib/cache");
@@ -38,27 +38,19 @@ app.get("/:config/manifest.json", (req, res) => {
   });
 });
 
-// Stremio appends an optional extra segment with query-string-style params,
-// e.g. /subtitles/movie/tt123/videoHash=abc123&videoSize=456.json - it's how
-// the exact playing file's OpenSubtitles hash reaches the addon, when the
-// stream source provides one.
-app.get("/:config/subtitles/:type/:id/:extra?.json", async (req, res) => {
+app.get("/:config/subtitles/:type/:id.json", async (req, res) => {
   const cfg = decodeConfig(req.params.config);
   if (!cfg) return res.status(400).json({ error: "Invalid config" });
 
   try {
     // id format: tt1234567 or tt1234567:season:episode
     const [imdbId, season, episode] = req.params.id.split(":");
-
-    const extraParams = new URLSearchParams(req.params.extra || "");
-    const videoHash = extraParams.get("videoHash") || null;
-
-    const identity = { imdbId, season, episode, videoHash };
+    const identity = { imdbId, season, episode };
 
     let url = await getCached(identity);
 
     if (!url) {
-      const lockKey = videoHash || `${imdbId}:${season || ""}:${episode || ""}`;
+      const lockKey = `${imdbId}:${season || ""}:${episode || ""}`;
       if (!inFlight.has(lockKey)) {
         inFlight.set(
           lockKey,
@@ -75,9 +67,22 @@ app.get("/:config/subtitles/:type/:id/:extra?.json", async (req, res) => {
   }
 });
 
+// Debug helper: hit this after deploying to see Podnapisi's real raw response
+// for a given movie. Useful for confirming/fixing field names if translation
+// isn't finding subtitles for a specific title.
+app.get("/debug/podnapisi", async (req, res) => {
+  const imdb = req.query.imdb;
+  if (!imdb) return res.status(400).json({ error: "pass ?imdb=tt1234567" });
+  try {
+    const raw = await rawSearch(imdb);
+    res.json(raw);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 async function translateAndCache(geminiKey, identity) {
-  const { srt: englishSrt, matchedByHash } = await fetchEnglishSrt(identity);
-  console.log(`${identity.imdbId}: source subtitle matched by ${matchedByHash ? "exact hash" : "IMDB search (approximate sync)"}`);
+  const { srt: englishSrt } = await fetchEnglishSrt(identity);
 
   const entries = parseSrt(englishSrt);
   const translated = await translateEntries(geminiKey, entries, {
