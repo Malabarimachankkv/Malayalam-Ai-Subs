@@ -121,7 +121,7 @@
     <div class="step-num">STEP 2</div>
     <h2>Paste it below</h2>
     <p>The key is embedded directly into your install link. It never touches a database.</p>
-    <input type="text" id="apiKey" placeholder="AIzaSy..." autocomplete="off" spellcheck="false" />
+    <input type="text" id="apiKey" placeholder="Paste your Gemini API key" autocomplete="off" spellcheck="false" />
     <button id="generateBtn">Generate install link</button>
     <div id="err"></div>
   </div>
@@ -169,8 +169,8 @@
     var key = input.value.trim();
     err.style.display = 'none';
 
-    if (key.indexOf('AIza') !== 0 || key.length < 20) {
-      err.textContent = "That does not look like a valid Gemini API key. Double check you copied the whole thing.";
+    if (key.length < 15) {
+      err.textContent = "That looks too short to be a full API key. Double check you copied the whole thing.";
       err.style.display = 'block';
       return;
     }
