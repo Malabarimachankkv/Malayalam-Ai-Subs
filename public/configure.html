@@ -114,7 +114,7 @@
     <div class="step-num">STEP 1</div>
     <h2>Get a free Gemini API key</h2>
     <p>No credit card needed. Takes about 30 seconds.</p>
-    <p><a class="ext" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Open Google AI Studio →</a></p>
+    <p><a class="ext" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Open Google AI Studio &rarr;</a></p>
   </div>
 
   <div class="step">
@@ -138,49 +138,61 @@
     </div>
   </div>
 
-  <p class="note">Your key stays inside your personal install link — the addon uses it only to call Gemini on your behalf when a subtitle isn't already cached. Already-translated movies load instantly for everyone, no quota used.</p>
+  <p class="note">Your key stays inside your personal install link. Already-translated movies load instantly for everyone while the server is running, no quota used.</p>
 </div>
 
 <script>
-  const btn = document.getElementById('generateBtn');
-  const input = document.getElementById('apiKey');
-  const err = document.getElementById('err');
-  const result = document.getElementById('result');
-  const urlBox = document.getElementById('manifestUrl');
-  const copyBtn = document.getElementById('copyBtn');
-  const installBtn = document.getElementById('installBtn');
+  var btn = document.getElementById('generateBtn');
+  var input = document.getElementById('apiKey');
+  var err = document.getElementById('err');
+  var result = document.getElementById('result');
+  var urlBox = document.getElementById('manifestUrl');
+  var copyBtn = document.getElementById('copyBtn');
+  var installBtn = document.getElementById('installBtn');
 
-  let manifestUrl = '';
+  var manifestUrl = '';
 
-  btn.addEventListener('click', () => {
-    const key = input.value.trim();
+  function base64UrlEncode(str) {
+    var b64 = btoa(str);
+    var out = '';
+    for (var i = 0; i < b64.length; i++) {
+      var c = b64.charAt(i);
+      if (c === '+') out += '-';
+      else if (c === '/') out += '_';
+      else if (c === '=') continue;
+      else out += c;
+    }
+    return out;
+  }
+
+  btn.addEventListener('click', function () {
+    var key = input.value.trim();
     err.style.display = 'none';
 
-    if (!key.startsWith('AIza') || key.length < 20) {
-      err.textContent = 'That doesn\\'t look like a valid Gemini API key. Double check you copied the whole thing.';
+    if (key.indexOf('AIza') !== 0 || key.length < 20) {
+      err.textContent = "That does not look like a valid Gemini API key. Double check you copied the whole thing.";
       err.style.display = 'block';
       return;
     }
 
-    const config = { geminiKey: key };
-    const encoded = btoa(JSON.stringify(config))
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '');
+    var config = { geminiKey: key };
+    var encoded = base64UrlEncode(JSON.stringify(config));
 
-    manifestUrl = `${window.location.origin}/${encoded}/manifest.json`;
+    manifestUrl = window.location.origin + '/' + encoded + '/manifest.json';
     urlBox.textContent = manifestUrl;
-    result.classList.add('show');
+    result.className = 'show';
   });
 
-  copyBtn.addEventListener('click', () => {
+  copyBtn.addEventListener('click', function () {
     navigator.clipboard.writeText(manifestUrl);
     copyBtn.textContent = 'Copied!';
-    setTimeout(() => (copyBtn.textContent = 'Copy link'), 1500);
+    setTimeout(function () { copyBtn.textContent = 'Copy link'; }, 1500);
   });
 
-  installBtn.addEventListener('click', () => {
-    const stremioUrl = manifestUrl.replace(/^https?:\\/\\//, 'stremio://');
+  installBtn.addEventListener('click', function () {
+    var stremioUrl = manifestUrl.indexOf('https://') === 0
+      ? 'stremio://' + manifestUrl.slice('https://'.length)
+      : (manifestUrl.indexOf('http://') === 0 ? 'stremio://' + manifestUrl.slice('http://'.length) : manifestUrl);
     window.location.href = stremioUrl;
   });
 </script>
