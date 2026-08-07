@@ -3,8 +3,41 @@ const path = require("path");
 const { encodeConfig, decodeConfig } = require("./lib/config");
 const { fetchEnglishSrt } = require("./lib/subtitleSource");
 const { translateEntries } = require("./lib/translate");
-const { parseSrt, buildSrt } = require("./lib/srt");
+const { parseSrt, buildSrt, startSeconds } = require("./lib/srt");
 const { getCached, putCached } = require("./lib/cache");
+
+function formatSrtTime(totalSeconds) {
+  const t = Math.max(0, totalSeconds);
+  const h = Math.floor(t / 3600);
+  const m = Math.floor((t % 3600) / 60);
+  const s = Math.floor(t % 60);
+  const ms = Math.round((t - Math.floor(t)) * 1000);
+  const pad = (n, len = 2) => String(n).padStart(len, "0");
+  return `${pad(h)}:${pad(m)}:${pad(s)},${pad(ms, 3)}`;
+}
+
+// Builds a subtitle file that is ALWAYS entirely in Malayalam: real
+// translated cues for everything finished so far, plus - if the movie isn't
+// fully translated yet - a single honest cue in Malayalam covering the rest
+// of the runtime. Never falls back to raw English; showing English would
+// defeat the point of this addon for viewers who don't read English.
+function buildLiveSrt(translatedSoFar, allEntries, progressLabel) {
+  if (translatedSoFar.length >= allEntries.length) {
+    return buildSrt(translatedSoFar);
+  }
+
+  const nextUntranslated = allEntries[translatedSoFar.length];
+  const startAt = translatedSoFar.length > 0 ? startSeconds(nextUntranslated) : 0;
+
+  const cue = {
+    timing: `${formatSrtTime(startAt)} --> 09:59:59,000`,
+    text:
+      `ബാക്കി ഭാഗം മലയാളത്തിലേക്ക് പരിഭാഷപ്പെടുത്തിക്കൊണ്ടിരിക്കുന്നു${progressLabel ? ` (${progressLabel})` : ""}. ` +
+      "അല്പസമയത്തിനു ശേഷം വീഡിയോ പോസ് ചെയ്ത്, ഈ സബ്‌ടൈറ്റിൽ ട്രാക്ക് വീണ്ടും തിരഞ്ഞെടുക്കുക.",
+  };
+
+  return buildSrt(translatedSoFar.concat([cue]));
+}
 
 const app = express();
 app.use(express.json());
@@ -125,22 +158,18 @@ async function translateAndCache(geminiKey, identity, key) {
   const englishSrt = await fetchEnglishSrt(identity);
   const entries = parseSrt(englishSrt);
 
-  // Serve real (English) subtitles immediately instead of making the user
-  // wait through the whole translation before anything usable shows up -
-  // a long movie under a strict free-tier rate limit can take many minutes.
-  await putCached(identity, buildSrt(entries));
-
   const translated = await translateEntries(geminiKey, entries, {
-    onProgress: (done, total, snapshot) => {
+    onProgress: (done, total, translatedSoFar) => {
       console.log(`${identity.imdbId}: chunk ${done}/${total}`);
       const p = progress.get(key);
       if (p) {
         p.done = done;
         p.total = total;
       }
-      // Upgrade the cached file in place: everything translated so far is
-      // now Malayalam, the rest is still English until its chunk lands.
-      putCached(identity, buildSrt(snapshot)).catch(() => {});
+      // Upgrade the cache in place: everything translated so far is real
+      // Malayalam; anything left is represented by an honest Malayalam
+      // "still translating" cue - never English filler.
+      putCached(identity, buildLiveSrt(translatedSoFar, entries, `${done}/${total}`)).catch(() => {});
     },
   });
 
