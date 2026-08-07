@@ -80,6 +80,35 @@ function placeholderSrt() {
   );
 }
 
+// Shown when we couldn't even get a source English subtitle to translate -
+// nothing Gemini-related, no point retrying without a different source.
+function noSourceSrt() {
+  return (
+    "1\n00:00:00,000 --> 09:59:59,000\n" +
+    "ഈ ടൈറ്റിലിന് ഇംഗ്ലീഷ് സബ്‌ടൈറ്റിൽ കണ്ടെത്താനായില്ല, അതിനാൽ മലയാളം പരിഭാഷ സാധ്യമല്ല.\n" +
+    "No English subtitle could be found for this title, so Malayalam translation isn't possible.\n"
+  );
+}
+
+// Shown when a source subtitle was found but translation failed completely
+// (every chunk exhausted retries) - distinct from "still working."
+function translationFailedSrt() {
+  return (
+    "1\n00:00:00,000 --> 09:59:59,000\n" +
+    "മലയാളം പരിഭാഷ പരാജയപ്പെട്ടു. കുറച്ച് സമയത്തിനു ശേഷം വീണ്ടും ശ്രമിക്കുക.\n" +
+    "Malayalam translation failed. Please try again in a few minutes.\n"
+  );
+}
+
+// Prepended as an extra cue when SOME (not all) chunks failed - the rest of
+// the file is a real, working Malayalam translation, just incomplete.
+function partialFailureNotice() {
+  return (
+    "0\n00:00:00,000 --> 00:00:08,000\n" +
+    "ഈ സിനിമയുടെ ഒരു ഭാഗം പരിഭാഷപ്പെടുത്താൻ കഴിഞ്ഞില്ല - ആ ഭാഗങ്ങൾ ഇംഗ്ലീഷിൽ കാണും.\n\n"
+  );
+}
+
 // Serves the actual translated subtitle file - the URL returned above points here
 app.get("/subs/:key.srt", async (req, res) => {
   const key = req.params.key; // already includes season/episode suffix if any
@@ -97,12 +126,31 @@ app.get("/subs/:key.srt", async (req, res) => {
 });
 
 async function translateAndCache(geminiKey, identity) {
-  const englishSrt = await fetchEnglishSrt(identity);
+  let englishSrt;
+  try {
+    englishSrt = await fetchEnglishSrt(identity);
+  } catch (e) {
+    console.error(`${identity.imdbId}: no English source found:`, e.message);
+    // Cache the failure itself, so reselecting the track shows a clear
+    // reason instead of the "still translating" message forever.
+    return putCached(identity, noSourceSrt());
+  }
+
   const entries = parseSrt(englishSrt);
-  const translated = await translateEntries(geminiKey, entries, {
+  const { entries: translated, failedChunks, totalChunks } = await translateEntries(geminiKey, entries, {
     onProgress: (done, total) => console.log(`${identity.imdbId}: chunk ${done}/${total}`),
   });
-  const malayalamSrt = buildSrt(translated);
+
+  if (failedChunks === totalChunks) {
+    console.error(`${identity.imdbId}: all ${totalChunks} chunks failed - translation did not succeed`);
+    return putCached(identity, translationFailedSrt());
+  }
+
+  let malayalamSrt = buildSrt(translated);
+  if (failedChunks > 0) {
+    console.log(`${identity.imdbId}: ${failedChunks}/${totalChunks} chunks failed - caching partial translation with a notice`);
+    malayalamSrt = partialFailureNotice() + malayalamSrt;
+  }
   return putCached(identity, malayalamSrt);
 }
 
