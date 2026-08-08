@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Malayalam AI Subs — Review Queue</title>
+<style>
+  :root {
+    --bg: #12100d; --panel: #1b1815; --line: #332e26;
+    --gold: #c9973f; --text: #ede6da; --muted: #9c9285;
+    --ok: #6fae6a; --err: #e0654f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    padding: 40px 20px;
+  }
+  .wrap { max-width: 780px; margin: 0 auto; }
+  h1 { font-size: 24px; margin: 0 0 6px; }
+  p.lede { color: var(--muted); font-size: 14px; margin: 0 0 28px; }
+  .item {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 16px 18px; margin-bottom: 12px;
+  }
+  .item-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .fname { font-weight: 600; font-size: 15px; word-break: break-all; }
+  .meta { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .status { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 3px 8px; border-radius: 4px; }
+  .status.pending { background: #3a3120; color: var(--gold); }
+  .status.approved { background: #1f3320; color: var(--ok); }
+  .status.rejected { background: #3a2020; color: var(--err); }
+  .actions { display: flex; gap: 8px; margin-top: 12px; }
+  button {
+    background: transparent; border: 1px solid var(--line); color: var(--text);
+    padding: 7px 12px; border-radius: 6px; font-size: 13px; cursor: pointer;
+  }
+  button:hover { border-color: var(--gold); }
+  button.approve:hover { border-color: var(--ok); color: var(--ok); }
+  button.reject:hover { border-color: var(--err); color: var(--err); }
+  #empty { color: var(--muted); font-size: 14px; padding: 20px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Review Queue</h1>
+  <p class="lede">Subtitles uploaded and translated via <code>/configure</code>, waiting on a look before anything moves further. Queue is in-memory — it clears if the server restarts.</p>
+  <div id="list"></div>
+  <div id="empty" style="display:none;">Nothing in the queue right now.</div>
+</div>
+
+<script>
+  async function load() {
+    const res = await fetch('/api/queue');
+    const items = await res.json();
+    const list = document.getElementById('list');
+    const empty = document.getElementById('empty');
+    list.innerHTML = '';
+    if (!items.length) { empty.style.display = 'block'; return; }
+    empty.style.display = 'none';
+
+    items.forEach(function (item) {
+      const el = document.createElement('div');
+      el.className = 'item';
+      const date = new Date(item.createdAt).toLocaleString();
+      el.innerHTML =
+        '<div class="item-top">' +
+          '<div><div class="fname">' + escapeHtml(item.originalFilename) + '</div>' +
+          '<div class="meta">' + item.lineCount + ' lines &middot; ' + date + (item.note ? ' &middot; ' + escapeHtml(item.note) : '') + '</div></div>' +
+          '<span class="status ' + item.status + '">' + item.status + '</span>' +
+        '</div>' +
+        '<div class="actions">' +
+          '<button class="download">Download .srt</button>' +
+          '<button class="approve">Approve</button>' +
+          '<button class="reject">Reject</button>' +
+        '</div>';
+
+      el.querySelector('.download').addEventListener('click', function () {
+        window.location.href = '/api/queue/' + item.id + '/download';
+      });
+      el.querySelector('.approve').addEventListener('click', function () { setStatus(item.id, 'approved'); });
+      el.querySelector('.reject').addEventListener('click', function () { setStatus(item.id, 'rejected'); });
+
+      list.appendChild(el);
+    });
+  }
+
+  async function setStatus(id, status) {
+    await fetch('/api/queue/' + id + '/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: status }),
+    });
+    load();
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  load();
+</script>
+</body>
+</html>
