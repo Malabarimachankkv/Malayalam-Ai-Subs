@@ -1,7 +1,7 @@
 {
   "name": "malayalam-ai-subs",
   "version": "1.0.0",
-  "description": "Stremio/Nuvio addon that auto-translates English subtitles to Malayalam using each user's own free Gemini API key",
+  "description": "Upload an English subtitle file and get it translated to Malayalam using your own free Gemini API key",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

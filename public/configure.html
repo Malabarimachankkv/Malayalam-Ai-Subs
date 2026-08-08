@@ -37,16 +37,6 @@
   h1 { font-size: 30px; line-height: 1.25; margin: 0 0 12px; font-weight: 700; }
   p.lede { color: var(--muted); font-size: 15px; line-height: 1.6; margin: 0 0 28px; }
 
-  .tabs { display: flex; gap: 6px; margin-bottom: 24px; border-bottom: 1px solid var(--line); }
-  .tab {
-    padding: 10px 4px; margin-bottom: -1px; border: none; background: none;
-    color: var(--muted); font-size: 14px; font-weight: 600; cursor: pointer;
-    border-bottom: 2px solid transparent;
-  }
-  .tab.active { color: var(--gold); border-bottom-color: var(--gold); }
-  .panel { display: none; }
-  .panel.active { display: block; }
-
   .step {
     background: var(--panel);
     border: 1px solid var(--line);
@@ -90,26 +80,14 @@
   button:hover { filter: brightness(1.08); }
   button:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  #result, #uploadResult { display: none; margin-top: 16px; }
-  #result.show, #uploadResult.show { display: block; }
-  .url-box {
-    background: #0e0c0a;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 12px 14px;
-    font-family: ui-monospace, monospace;
-    font-size: 12px;
-    word-break: break-all;
-    color: var(--muted);
-    margin-bottom: 10px;
-  }
+  #uploadResult { display: none; margin-top: 16px; }
+  #uploadResult.show { display: block; }
   .btn-row { display: flex; gap: 10px; }
   .btn-row button { margin-top: 0; }
   .btn-secondary { background: transparent; border: 1px solid var(--gold); color: var(--gold); }
-  #err, #uploadErr { color: var(--err); font-size: 13px; margin-top: 10px; display: none; }
+  #uploadErr { color: var(--err); font-size: 13px; margin-top: 10px; display: none; }
   #uploadOk { color: var(--ok); font-size: 13px; margin-top: 10px; display: none; }
   #uploadStatus { color: var(--muted); font-size: 13px; margin-top: 10px; display: none; }
-  .note { font-size: 12px; color: var(--muted); margin-top: 28px; line-height: 1.6; }
 
   .spinner {
     display: inline-block; width: 13px; height: 13px; border: 2px solid var(--line);
@@ -122,100 +100,48 @@
 <body>
 <div class="wrap">
   <div class="eyebrow">Malayalam AI Subs</div>
-  <h1>Every subtitle, in your own words.</h1>
-  <p class="lede">Translate an English subtitle file to Malayalam with your own free Gemini key — or install the addon so Stremio/Nuvio translates on the fly while you watch.</p>
+  <h1>English subtitles, translated to Malayalam.</h1>
+  <p class="lede">Upload an English subtitle file and get it back translated into Malayalam, using your own free Gemini key.</p>
 
-  <div class="tabs">
-    <button class="tab active" data-tab="upload">Upload &amp; Translate</button>
-    <button class="tab" data-tab="stremio">Install in Stremio</button>
+  <div class="step">
+    <div class="step-num">STEP 1</div>
+    <h2>Get a free Gemini API key</h2>
+    <p>No credit card needed. Takes about 30 seconds. Your key is only ever sent straight to Google to translate your file — it's never stored on this server.</p>
+    <p><a class="ext" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Open Google AI Studio &rarr;</a></p>
   </div>
 
-  <!-- ============== UPLOAD & TRANSLATE (primary) ============== -->
-  <div class="panel active" id="panel-upload">
-    <div class="step">
-      <div class="step-num">STEP 1</div>
-      <h2>Get a free Gemini API key</h2>
-      <p>No credit card needed. Takes about 30 seconds. Your key is only ever sent straight to Google to translate your file — it's never stored on this server.</p>
-      <p><a class="ext" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Open Google AI Studio &rarr;</a></p>
-    </div>
+  <div class="step">
+    <div class="step-num">STEP 2</div>
+    <h2>Upload a subtitle file</h2>
+    <p>An English <code>.srt</code> file. Longer files (a full movie) can take several minutes under Gemini's free-tier rate limit, so keep this tab open.</p>
 
-    <div class="step">
-      <div class="step-num">STEP 2</div>
-      <h2>Upload a subtitle file</h2>
-      <p>An English <code>.srt</code> file — from Movie Mirror, Team GOAT, wherever you found it. Longer files (a full movie) can take several minutes under Gemini's free-tier rate limit, so keep this tab open.</p>
+    <label class="field-label" for="geminiKeyUpload">Your Gemini API key</label>
+    <input type="text" id="geminiKeyUpload" placeholder="Paste your Gemini API key" autocomplete="off" spellcheck="false" />
 
-      <label class="field-label" for="geminiKeyUpload">Your Gemini API key</label>
-      <input type="text" id="geminiKeyUpload" placeholder="Paste your Gemini API key" autocomplete="off" spellcheck="false" />
+    <label class="field-label" for="srtFile">Subtitle file (.srt)</label>
+    <input type="file" id="srtFile" accept=".srt" />
 
-      <label class="field-label" for="srtFile">Subtitle file (.srt)</label>
-      <input type="file" id="srtFile" accept=".srt" />
+    <label class="field-label" for="noteField">Note for the reviewer (optional)</label>
+    <input type="text" id="noteField" placeholder="e.g. movie title, in case the filename doesn't say" autocomplete="off" />
 
-      <label class="field-label" for="noteField">Note for the reviewer (optional)</label>
-      <input type="text" id="noteField" placeholder="e.g. movie title, in case the filename doesn't say" autocomplete="off" />
-
-      <button id="translateBtn">Translate to Malayalam</button>
-      <div id="uploadStatus"></div>
-      <div id="uploadErr"></div>
-      <div id="uploadOk"></div>
-    </div>
-
-    <div id="uploadResult">
-      <div class="step">
-        <h2>Done</h2>
-        <p>Your translated file has downloaded. It's also been added to the review queue.</p>
-        <div class="btn-row">
-          <button id="downloadAgainBtn" class="btn-secondary">Download again</button>
-        </div>
-      </div>
-    </div>
+    <button id="translateBtn">Translate to Malayalam</button>
+    <div id="uploadStatus"></div>
+    <div id="uploadErr"></div>
+    <div id="uploadOk"></div>
   </div>
 
-  <!-- ============== STREMIO INSTALL LINK (secondary) ============== -->
-  <div class="panel" id="panel-stremio">
+  <div id="uploadResult">
     <div class="step">
-      <div class="step-num">STEP 1</div>
-      <h2>Get a free Gemini API key</h2>
-      <p>No credit card needed. Takes about 30 seconds.</p>
-      <p><a class="ext" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Open Google AI Studio &rarr;</a></p>
-    </div>
-
-    <div class="step">
-      <div class="step-num">STEP 2</div>
-      <h2>Paste it below</h2>
-      <p>The key is embedded directly into your install link. It never touches a database.</p>
-      <input type="text" id="apiKey" placeholder="Paste your Gemini API key" autocomplete="off" spellcheck="false" />
-      <button id="generateBtn">Generate install link</button>
-      <div id="err"></div>
-    </div>
-
-    <div id="result">
-      <div class="step">
-        <h2>You're set</h2>
-        <p>Copy this link into Nuvio/Stremio's addon search, or tap install directly.</p>
-        <div class="url-box" id="manifestUrl"></div>
-        <div class="btn-row">
-          <button id="copyBtn" class="btn-secondary">Copy link</button>
-          <button id="installBtn">Install in Stremio</button>
-        </div>
+      <h2>Done</h2>
+      <p>Your translated file has downloaded. It's also been added to the review queue.</p>
+      <div class="btn-row">
+        <button id="downloadAgainBtn" class="btn-secondary">Download again</button>
       </div>
     </div>
-
-    <p class="note">Your key stays inside your personal install link. Already-translated movies load instantly for everyone while the server is running, no quota used.</p>
   </div>
 </div>
 
 <script>
-  // --- Tabs ---
-  document.querySelectorAll('.tab').forEach(function (tab) {
-    tab.addEventListener('click', function () {
-      document.querySelectorAll('.tab').forEach(function (t) { t.classList.remove('active'); });
-      document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('active'); });
-      tab.classList.add('active');
-      document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
-    });
-  });
-
-  // --- Upload & Translate ---
   var translateBtn = document.getElementById('translateBtn');
   var lastBlobUrl = null;
   var lastFilename = 'translated.ml.srt';
@@ -289,60 +215,6 @@
     a.click();
     document.body.removeChild(a);
   }
-
-  // --- Stremio install link (unchanged behavior) ---
-  var btn = document.getElementById('generateBtn');
-  var input = document.getElementById('apiKey');
-  var err = document.getElementById('err');
-  var result = document.getElementById('result');
-  var urlBox = document.getElementById('manifestUrl');
-  var copyBtn = document.getElementById('copyBtn');
-  var installBtn = document.getElementById('installBtn');
-  var manifestUrl = '';
-
-  function base64UrlEncode(str) {
-    var b64 = btoa(str);
-    var out = '';
-    for (var i = 0; i < b64.length; i++) {
-      var c = b64.charAt(i);
-      if (c === '+') out += '-';
-      else if (c === '/') out += '_';
-      else if (c === '=') continue;
-      else out += c;
-    }
-    return out;
-  }
-
-  btn.addEventListener('click', function () {
-    var key = input.value.trim();
-    err.style.display = 'none';
-
-    if (key.length < 15) {
-      err.textContent = 'That looks too short to be a full API key. Double check you copied the whole thing.';
-      err.style.display = 'block';
-      return;
-    }
-
-    var config = { geminiKey: key };
-    var encoded = base64UrlEncode(JSON.stringify(config));
-
-    manifestUrl = window.location.origin + '/' + encoded + '/manifest.json';
-    urlBox.textContent = manifestUrl;
-    result.className = 'show';
-  });
-
-  copyBtn.addEventListener('click', function () {
-    navigator.clipboard.writeText(manifestUrl);
-    copyBtn.textContent = 'Copied!';
-    setTimeout(function () { copyBtn.textContent = 'Copy link'; }, 1500);
-  });
-
-  installBtn.addEventListener('click', function () {
-    var stremioUrl = manifestUrl.indexOf('https://') === 0
-      ? 'stremio://' + manifestUrl.slice('https://'.length)
-      : (manifestUrl.indexOf('http://') === 0 ? 'stremio://' + manifestUrl.slice('http://'.length) : manifestUrl);
-    window.location.href = stremioUrl;
-  });
 </script>
 </body>
 </html>
