@@ -64,6 +64,14 @@
   input[type=file] { font-family: -apple-system, sans-serif; padding: 10px 14px; }
   label.field-label { display: block; font-size: 12px; color: var(--muted); margin: 14px 0 6px; }
   label.field-label:first-child { margin-top: 0; }
+  .remember-row {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 8px; font-size: 12px; color: var(--muted);
+  }
+  .remember-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .remember-row input[type=checkbox] { width: auto; accent-color: var(--gold); }
+  .remember-row a { color: var(--muted); text-decoration: underline; cursor: pointer; }
+  .remember-row a:hover { color: var(--gold); }
 
   button {
     width: 100%;
@@ -106,7 +114,7 @@
   <div class="step">
     <div class="step-num">STEP 1</div>
     <h2>Get a free Gemini API key</h2>
-    <p>No credit card needed. Takes about 30 seconds. Your key is only ever sent straight to Google to translate your file — it's never stored on this server.</p>
+    <p>No credit card needed. Takes about 30 seconds. Your key is only ever sent straight to Google to translate your file — it's never stored on this server. If you check "remember this key," it's saved only in this browser (not sent to us) so you don't have to retype it next time.</p>
     <p><a class="ext" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Open Google AI Studio &rarr;</a></p>
   </div>
 
@@ -117,6 +125,10 @@
 
     <label class="field-label" for="geminiKeyUpload">Your Gemini API key</label>
     <input type="text" id="geminiKeyUpload" placeholder="Paste your Gemini API key" autocomplete="off" spellcheck="false" />
+    <div class="remember-row">
+      <label><input type="checkbox" id="rememberKey" /> Remember this key on this device</label>
+      <a href="#" id="forgetKey">Forget saved key</a>
+    </div>
 
     <label class="field-label" for="srtFile">Subtitle file (.srt)</label>
     <input type="file" id="srtFile" accept=".srt" />
@@ -143,11 +155,32 @@
 
 <script>
   var translateBtn = document.getElementById('translateBtn');
-  var lastBlobUrl = null;
-  var lastFilename = 'translated.ml.srt';
+  var lastDownloadUrl = null;
+  var geminiKeyInput = document.getElementById('geminiKeyUpload');
+  var rememberCheckbox = document.getElementById('rememberKey');
+  var forgetLink = document.getElementById('forgetKey');
+  var STORAGE_KEY = 'malayalamAiSubs.geminiKey';
+
+  // On load: if a key was saved on this device, pre-fill it and check the box.
+  // Never sent anywhere except in the translate request itself, same as if
+  // the person had just typed it — this only saves them retyping it.
+  (function restoreSavedKey() {
+    var saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      geminiKeyInput.value = saved;
+      rememberCheckbox.checked = true;
+    }
+  })();
+
+  forgetLink.addEventListener('click', function (e) {
+    e.preventDefault();
+    localStorage.removeItem(STORAGE_KEY);
+    rememberCheckbox.checked = false;
+    geminiKeyInput.value = '';
+  });
 
   translateBtn.addEventListener('click', async function () {
-    var key = document.getElementById('geminiKeyUpload').value.trim();
+    var key = geminiKeyInput.value.trim();
     var fileInput = document.getElementById('srtFile');
     var note = document.getElementById('noteField').value.trim();
     var errEl = document.getElementById('uploadErr');
@@ -170,6 +203,12 @@
       return;
     }
 
+    if (rememberCheckbox.checked) {
+      localStorage.setItem(STORAGE_KEY, key);
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+
     var formData = new FormData();
     formData.append('geminiKey', key);
     formData.append('note', note);
@@ -184,14 +223,14 @@
       var data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Translation failed.');
 
-      lastFilename = data.filename;
-      var blob = new Blob([data.srt], { type: 'text/plain;charset=utf-8' });
-      if (lastBlobUrl) URL.revokeObjectURL(lastBlobUrl);
-      lastBlobUrl = URL.createObjectURL(blob);
-      triggerDownload(lastBlobUrl, lastFilename);
+      // A real server URL, not a blob: one — some in-app browsers (notably
+      // Facebook/Instagram's) block or mishandle blob: downloads. This
+      // works the same way clicking any normal download link does.
+      lastDownloadUrl = '/api/translate-upload/' + data.id + '/download';
+      window.location.href = lastDownloadUrl;
 
       statusEl.style.display = 'none';
-      okEl.textContent = 'Translated successfully.';
+      okEl.textContent = 'Translated successfully. If the download didn\'t start, use the button below — or open this page in Chrome/Safari instead of an in-app browser.';
       okEl.style.display = 'block';
       document.getElementById('uploadResult').className = 'show';
     } catch (e) {
@@ -204,17 +243,8 @@
   });
 
   document.getElementById('downloadAgainBtn').addEventListener('click', function () {
-    if (lastBlobUrl) triggerDownload(lastBlobUrl, lastFilename);
+    if (lastDownloadUrl) window.location.href = lastDownloadUrl;
   });
-
-  function triggerDownload(url, filename) {
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  }
 </script>
 </body>
 </html>

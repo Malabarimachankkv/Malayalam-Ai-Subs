@@ -56,6 +56,21 @@ app.post("/api/translate-upload", upload.single("file"), async (req, res) => {
   }
 });
 
+// Public, unauthenticated, scoped only to the id just returned above (a
+// random 12-char token, not guessable/listable) — this is what the page
+// actually downloads from. Deliberately a real server URL rather than a
+// client-side blob: URL: some in-app browsers (Facebook/Instagram's
+// WebView is the one that's actually been reported) block or mishandle
+// blob: downloads and show a generic "Page can't be loaded" error, but
+// they handle a normal https download with Content-Disposition fine.
+app.get("/api/translate-upload/:id/download", (req, res) => {
+  const item = uploadQueue.get(req.params.id);
+  if (!item) return res.status(404).send("Not found — this link is only valid until the server restarts.");
+  res.set("Content-Type", "text/plain; charset=utf-8");
+  res.set("Content-Disposition", `attachment; filename="${item.originalFilename.replace(/\.[^.]+$/, "")}.ml.srt"`);
+  res.send(item.translatedSrt);
+});
+
 // --- Review queue (admin-only) --------------------------------------------
 
 app.get("/admin/queue", requireAdminAuth, (req, res) => {
