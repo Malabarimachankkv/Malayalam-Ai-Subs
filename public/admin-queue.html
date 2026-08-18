@@ -26,6 +26,8 @@
   .item-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
   .fname { font-weight: 600; font-size: 15px; word-break: break-all; }
   .meta { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .imdb-link { color: var(--gold); text-decoration: none; }
+  .imdb-link:hover { text-decoration: underline; }
   .status { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 3px 8px; border-radius: 4px; }
   .status.pending { background: #3a3120; color: var(--gold); }
   .status.approved { background: #1f3320; color: var(--ok); }
@@ -66,7 +68,7 @@
       el.innerHTML =
         '<div class="item-top">' +
           '<div><div class="fname">' + escapeHtml(item.originalFilename) + '</div>' +
-          '<div class="meta">' + item.lineCount + ' lines &middot; ' + date + (item.note ? ' &middot; ' + escapeHtml(item.note) : '') + '</div></div>' +
+          '<div class="meta"><a class="imdb-link" href="https://www.imdb.com/title/' + escapeHtml(item.imdbId) + '/" target="_blank" rel="noopener">' + escapeHtml(item.imdbId) + '</a> &middot; ' + item.lineCount + ' lines &middot; ' + date + (item.note ? ' &middot; ' + escapeHtml(item.note) : '') + '</div></div>' +
           '<span class="status ' + item.status + '">' + item.status + '</span>' +
         '</div>' +
         '<div class="actions">' +
