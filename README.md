@@ -13,12 +13,12 @@ is shared. Everything else (code, deploy, server) is still separate.
 
 1. Visit `/configure`.
 2. Get a free Gemini API key (linked on the page, ~30 seconds, no card).
-3. Upload an English `.srt` file — however you found it — along with the
-   movie/show's **IMDb ID** (e.g. `tt1234567`, from its IMDb URL).
+3. Upload an English `.srt` file — however you found it.
 4. Get the translated Malayalam file back as a download. It's also saved to
    an admin-only **review queue** at `/admin/queue` (password-protected —
-   see `ADMIN_PASSWORD` below), tagged with that IMDb ID, so someone can
-   check quality and know exactly which title it belongs to.
+   see `ADMIN_PASSWORD` below), so someone can check quality — the optional
+   note field is the only way to flag which title it is, if the filename
+   doesn't already make that obvious.
 
 Longer files (a full movie) can take several minutes under Gemini's
 free-tier rate limit — the page says so up front, and the request just runs

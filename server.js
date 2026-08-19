@@ -30,12 +30,8 @@ app.get("/", (req, res) => res.redirect("/configure"));
 app.post("/api/translate-upload", upload.single("file"), async (req, res) => {
   try {
     const geminiKey = (req.body.geminiKey || "").trim();
-    const imdbId = (req.body.imdbId || "").trim();
     if (!geminiKey) return res.status(400).json({ error: "Missing Gemini API key." });
     if (!req.file) return res.status(400).json({ error: "No file uploaded." });
-    if (!/^tt\d{5,9}$/i.test(imdbId)) {
-      return res.status(400).json({ error: 'IMDb ID looks wrong — expected a format like "tt1234567".' });
-    }
 
     const text = req.file.buffer.toString("utf8");
     const entries = parseSrt(text);
@@ -47,7 +43,6 @@ app.post("/api/translate-upload", upload.single("file"), async (req, res) => {
     const translatedSrt = buildSrt(translated);
 
     const id = await uploadQueue.add({
-      imdbId: imdbId.toLowerCase(),
       originalFilename: req.file.originalname,
       translatedSrt,
       lineCount: entries.length,

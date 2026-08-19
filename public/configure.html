@@ -133,9 +133,6 @@
     <label class="field-label" for="srtFile">Subtitle file (.srt)</label>
     <input type="file" id="srtFile" accept=".srt" />
 
-    <label class="field-label" for="imdbIdField">IMDb ID</label>
-    <input type="text" id="imdbIdField" placeholder="e.g. tt1234567" autocomplete="off" spellcheck="false" />
-
     <label class="field-label" for="noteField">Note for the reviewer (optional)</label>
     <input type="text" id="noteField" placeholder="e.g. movie title, in case the filename doesn't say" autocomplete="off" />
 
@@ -185,7 +182,6 @@
   translateBtn.addEventListener('click', async function () {
     var key = geminiKeyInput.value.trim();
     var fileInput = document.getElementById('srtFile');
-    var imdbId = document.getElementById('imdbIdField').value.trim();
     var note = document.getElementById('noteField').value.trim();
     var errEl = document.getElementById('uploadErr');
     var okEl = document.getElementById('uploadOk');
@@ -206,11 +202,6 @@
       errEl.style.display = 'block';
       return;
     }
-    if (!/^tt\d{5,9}$/i.test(imdbId)) {
-      errEl.textContent = 'IMDb ID looks wrong — expected a format like "tt1234567" (find it in the movie\'s IMDb URL).';
-      errEl.style.display = 'block';
-      return;
-    }
 
     if (rememberCheckbox.checked) {
       localStorage.setItem(STORAGE_KEY, key);
@@ -220,7 +211,6 @@
 
     var formData = new FormData();
     formData.append('geminiKey', key);
-    formData.append('imdbId', imdbId);
     formData.append('note', note);
     formData.append('file', fileInput.files[0]);
 
