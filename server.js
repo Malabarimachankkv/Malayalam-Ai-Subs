@@ -8,7 +8,7 @@ const { requireAdminAuth } = require("./lib/adminAuth");
 
 // Subtitle files are small text — 2MB is generous headroom over even a very
 // long movie's .srt, and keeps someone from accidentally uploading a video
-// file into a memory-only store.
+// file into memory.
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
 
 const app = express();
@@ -22,11 +22,10 @@ app.get("/configure", (req, res) => {
 app.get("/", (req, res) => res.redirect("/configure"));
 
 // --- Upload & translate ---------------------------------------------------
-// Someone uploads an English .srt they already have — wherever it came
-// from — pastes their own Gemini key, and gets it back translated to
-// Malayalam. Runs synchronously (the visitor is on the page waiting); a
-// very long movie under a strict free-tier rate limit could take several
-// minutes — the page says so up front.
+// Someone uploads an English .srt, pastes their own Gemini key, and gets it
+// back translated to Malayalam. Runs synchronously (the visitor is on the
+// page waiting); a very long movie under a strict free-tier rate limit
+// could take several minutes — the page says so up front.
 app.post("/api/translate-upload", upload.single("file"), async (req, res) => {
   try {
     const geminiKey = (req.body.geminiKey || "").trim();
@@ -58,11 +57,9 @@ app.post("/api/translate-upload", upload.single("file"), async (req, res) => {
 
 // Public, unauthenticated, scoped only to the id just returned above (a
 // random 12-char token, not guessable/listable) — this is what the page
-// actually downloads from. Deliberately a real server URL rather than a
-// client-side blob: URL: some in-app browsers (Facebook/Instagram's
-// WebView is the one that's actually been reported) block or mishandle
-// blob: downloads and show a generic "Page can't be loaded" error, but
-// they handle a normal https download with Content-Disposition fine.
+// itself downloads from. A real server URL rather than a client-side blob:
+// URL, since some in-app browsers (Facebook/Instagram's WebView) block or
+// mishandle blob: downloads.
 app.get("/api/translate-upload/:id/download", async (req, res) => {
   try {
     const item = await uploadQueue.get(req.params.id);
